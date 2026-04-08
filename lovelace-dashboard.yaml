@@ -49,17 +49,14 @@ cards:
     filter:
       include:
         - integration: postnord
-          domain: sensor
-          not:
-            attributes:
-              archived: true
-          # Exkludera brevutdelningssensorn
-          entity_id: "sensor.postnord_(?!mailbox).*"
+          attributes:
+            archived: false
+      exclude:
+        - entity_id: "sensor.postnord_mailbox_*"
     sort:
       method: attribute
       attribute: eta_timestamp
       numeric: true
-      ignore_case: true
     card:
       type: entities
       title: Pågående paket
@@ -75,6 +72,8 @@ cards:
           attributes:
             is_delayed: true
             archived: false
+      exclude:
+        - entity_id: "sensor.postnord_mailbox_*"
     card:
       type: entities
       title: ⚠️ Försenade paket
@@ -89,6 +88,8 @@ cards:
         - integration: postnord
           attributes:
             archived: true
+      exclude:
+        - entity_id: "sensor.postnord_mailbox_*"
     card:
       type: entities
       title: Levererade paket
