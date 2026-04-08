@@ -12,7 +12,7 @@ import urllib.error
 
 API_KEY_FILE = os.path.join(os.path.dirname(__file__), "api.key")
 BASE_URL = "https://api2.postnord.com/rest/shipment/v7/trackandtrace/id/{id}/public"
-TRACKING_URL_BASE = "https://api2.postnord.com/rest/shipment/v1/tracking/{country}/{id}"
+TRACKING_URL_BASE = "https://api2.postnord.com/rest/links/v1/tracking/{country}/{id}"
 
 
 def load_api_key(provided: str | None) -> str:
