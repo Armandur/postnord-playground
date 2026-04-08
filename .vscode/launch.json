@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "PostNord Track (api.key)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/track.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PostNord Track (ange apikey här)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/track.py",
+            "args": ["--apikey", "DIN_NYCKEL_HÄR"],
+            "console": "integratedTerminal"
+        }
+    ]
+}
