@@ -43,6 +43,34 @@ def track(shipment_id: str, api_key: str, locale: str = "sv") -> dict:
             return {"error": e.code, "detail": body}
 
 
+def fmt_address(addr: dict) -> str:
+    parts = [addr.get("street1"), addr.get("street2"), addr.get("postCode"), addr.get("city"), addr.get("country")]
+    return ", ".join(p for p in parts if p)
+
+
+def print_delivery_point(label: str, point: dict) -> None:
+    if not point:
+        return
+    name = point.get("displayName") or point.get("name") or ""
+    addr = fmt_address(point.get("address", {}))
+    loc_type = point.get("locationType") or point.get("servicePointType") or ""
+    parts = [name, addr, f"[{loc_type}]" if loc_type else ""]
+    print(f"  {label}: {', '.join(p for p in parts if p)}")
+    hours = point.get("openingHours", [])
+    if hours:
+        days = {
+            "monday": "Mån", "tuesday": "Tis", "wednesday": "Ons",
+            "thursday": "Tor", "friday": "Fre", "saturday": "Lör", "sunday": "Sön",
+        }
+        for h in hours:
+            open_days = "/".join(sv for en, sv in days.items() if h.get(en))
+            times = f"{h.get('openFrom', '')}-{h.get('openTo', '')}"
+            if h.get("openFrom2"):
+                times += f", {h['openFrom2']}-{h.get('openTo2', '')}"
+            if open_days:
+                print(f"    Öppet {open_days}: {times}")
+
+
 def print_result(data: dict) -> None:
     resp = data.get("TrackingInformationResponse", {})
 
@@ -70,21 +98,36 @@ def print_result(data: dict) -> None:
 
         if s.get("estimatedTimeOfArrival"):
             print(f"Beräknad leverans: {s['estimatedTimeOfArrival']}")
+        if s.get("publicTimeOfArrival"):
+            print(f"Publik ETA       : {s['publicTimeOfArrival']}")
         if s.get("deliveryDate"):
             print(f"Levererad        : {s['deliveryDate']}")
+        if s.get("riskForDelay"):
+            print("  ! Risk för försening")
 
         consignor = s.get("consignor", {})
         if consignor.get("name"):
             print(f"Avsändare : {consignor['name']}")
 
         consignee = s.get("consignee", {})
-        addr = consignee.get("address", {})
-        if addr.get("city"):
-            print(f"Till      : {addr.get('postCode', '')} {addr['city']}")
+        consignee_name = consignee.get("name", "")
+        consignee_addr = fmt_address(consignee.get("address", {}))
+        if consignee_name or consignee_addr:
+            print(f"Mottagare : {', '.join(p for p in [consignee_name, consignee_addr] if p)}")
 
         service = s.get("service", {})
         if service.get("name"):
             print(f"Tjänst    : {service['name']}")
+
+        # Leveranspunkter
+        requested = s.get("requestedDeliveryPoint", {})
+        actual = s.get("deliveryPoint", {})
+        destination = s.get("destinationDeliveryPoint", {})
+        if requested or actual or destination:
+            print("\n-- Leveranspunkter --")
+            print_delivery_point("Önskat ombud  ", requested)
+            print_delivery_point("Faktiskt ombud", actual)
+            print_delivery_point("Slutdestination", destination)
 
         items = s.get("items", [])
         for item in items:
@@ -93,6 +136,21 @@ def print_result(data: dict) -> None:
             item_status = item.get("statusText", {})
             if item_status.get("header"):
                 print(f"          {item_status['header']}")
+
+            if item.get("deliveryTo"):
+                print(f"  Lämnad till  : {item['deliveryTo']}")
+            if item.get("deliveryToInfo"):
+                print(f"  Leveransinfo : {item['deliveryToInfo']}")
+            if item.get("isPlacedInRetailParcelBox"):
+                print("  Placerad i paketbox")
+            if item.get("bookedDeliveryDateFrom"):
+                date_from = item["bookedDeliveryDateFrom"][:16]
+                date_to = item.get("bookedDeliveryDateTo", "")[:16]
+                print(f"  Bokad tid    : {date_from} – {date_to}")
+            if item.get("deliveryDate"):
+                print(f"  Levererad    : {item['deliveryDate'][:16]}")
+            if item.get("stoppedInCustoms"):
+                print("  ! Stoppad i tull")
 
             events = item.get("events", [])
             if events:
