@@ -50,8 +50,9 @@ cards:
     filter:
       include:
         - integration: postnord
+          attributes:
+            postnord_sensor_type: package
       exclude:
-        - entity_id: "sensor.postnord_mailbox_*"
         - state: DELIVERED
         - state: RETURNED
         - state: EXPIRED
@@ -73,9 +74,9 @@ cards:
     filter:
       include:
         - integration: postnord
+          attributes:
+            postnord_sensor_type: package
           state: DELIVERED
-      exclude:
-        - entity_id: "sensor.postnord_mailbox_*"
     card:
       type: entities
       title: Levererade paket

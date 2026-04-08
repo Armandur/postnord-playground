@@ -154,6 +154,7 @@ class PostNordSensor(CoordinatorEntity[PostNordCoordinator], SensorEntity):
         if d is None:
             return {ATTR_TRACKING_ID: self._tracking_id}
         return {
+            "postnord_sensor_type": "package",
             ATTR_TRACKING_ID: d.tracking_id,
             ATTR_OWNER: d.owner,
             ATTR_TRACKING_URL: d.tracking_url,
@@ -202,8 +203,9 @@ class PostNordMailboxSensor(CoordinatorEntity[MailboxCoordinator], SensorEntity)
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self.coordinator.data
         if d is None:
-            return {"postal_code": self._postal_code}
+            return {"postnord_sensor_type": "mailbox", "postal_code": self._postal_code}
         return {
+            "postnord_sensor_type": "mailbox",
             "postal_code": d.postal_code,
             "city": d.city,
             "last_delivery": d.last_delivery,
