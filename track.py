@@ -55,7 +55,13 @@ def get_tracking_url(shipment_id: str, api_key: str, country: str, language: str
         with urllib.request.urlopen(req) as resp:
             data = json.loads(resp.read().decode())
             return data.get("url")
-    except urllib.error.HTTPError:
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"\nTracking-URL misslyckades (HTTP {e.code}):")
+        try:
+            print(json.dumps(json.loads(body), indent=2, ensure_ascii=False))
+        except json.JSONDecodeError:
+            print(body)
         return None
 
 
