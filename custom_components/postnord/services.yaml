@@ -1,0 +1,46 @@
+add_package:
+  name: Lägg till paket
+  description: >
+    Lägger till ett paket att spåra. Accepterar sändningsnummer eller
+    fullständig PostNord-spårnings-URL (https://tracking.postnord.com/...).
+  fields:
+    tracking_id:
+      name: Sändningsnummer / URL
+      description: >
+        Sändningsnummer (t.ex. UO553662591SE) eller komplett PostNord-spårnings-URL.
+      required: true
+      example: "UO553662591SE"
+      selector:
+        text:
+    owner:
+      name: Ägare
+      description: Valfri fritext, t.ex. personens namn.
+      required: false
+      default: ""
+      example: "Rasmus"
+      selector:
+        text:
+    country:
+      name: Land
+      description: Avsändarland för spårnings-URL.
+      required: false
+      default: "SE"
+      selector:
+        select:
+          options:
+            - "SE"
+            - "NO"
+            - "FI"
+            - "DK"
+
+remove_package:
+  name: Ta bort paket
+  description: Slutar spåra ett paket och tar bort dess sensor.
+  fields:
+    tracking_id:
+      name: Sändningsnummer
+      description: Sändningsnumret på paketet som ska tas bort.
+      required: true
+      example: "UO553662591SE"
+      selector:
+        text:

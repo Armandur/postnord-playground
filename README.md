@@ -18,6 +18,7 @@ Ett projekt med två delar:
 - Dynamiska ikoner baserat på leveranstyp × status
 - Brevutdelningssensor: visar nästa utdelningsdag för ett postnummer
 - Stöder inmatning av sändningsnummer **eller** fullständiga PostNord-spårnings-URL:er
+- **HA-tjänster** för att lägga till/ta bort paket direkt från dashboard utan att gå in i Inställningar
 - HACS-kompatibel
 
 ### Installation
@@ -33,13 +34,115 @@ Ett projekt med två delar:
 
 ### Lägga till paket
 
-Via **Konfigurera** på integrationssidan → **Lägg till paket**.
+**Alternativ 1 — Via dashboard (rekommenderas):**
+Använd `postnord.add_package`-tjänsten direkt från Lovelace (se Dashboard-avsnittet nedan). Kräver att du sätter upp ett script och två input_text-hjälpare en gång.
+
+**Alternativ 2 — Via integrationsmenyn:**
+Gå till **Konfigurera** på integrationssidan → **Lägg till paket**.
 
 I textfältet kan du klistra in (ett per rad):
 - Sändningsnummer: `UO553662591SE`
 - Hela PostNord-spårnings-URL:er: `https://tracking.postnord.com/se/?id=24896bc2:...`
 
 Du kan blanda format fritt och lägga till flera paket på en gång.
+
+### HA-tjänster
+
+Integrationen registrerar två tjänster som kan anropas från Lovelace-knappar, automatiseringar och scripts:
+
+#### `postnord.add_package`
+
+| Parameter | Typ | Beskrivning |
+|---|---|---|
+| `tracking_id` | str (krävs) | Sändningsnummer eller PostNord-spårnings-URL |
+| `owner` | str (valfri) | Vems paket, t.ex. "Rasmus" |
+| `country` | str (valfri) | `SE` / `NO` / `FI` / `DK` (standard: `SE`) |
+
+#### `postnord.remove_package`
+
+| Parameter | Typ | Beskrivning |
+|---|---|---|
+| `tracking_id` | str (krävs) | Sändningsnumret som ska sluta spåras |
+
+Tjänsterna syns också i **Utvecklarverktyg → Tjänster** i HA.
+
+---
+
+## Dashboard-setup (rekommenderat)
+
+För att din sambo (eller du) ska kunna lägga till paket direkt från dashboarden utan att gå in i Inställningar:
+
+### Steg 1: Skapa input_text-hjälpare
+
+Gå till **Inställningar → Enheter & tjänster → Hjälpare → Lägg till → Text** och skapa:
+
+| Namn | Entitets-ID |
+|---|---|
+| Nytt sändningsnummer | `input_text.postnord_ny_forsandelse` |
+| Ägare | `input_text.postnord_agare` |
+
+### Steg 2: Skapa ett script
+
+Gå till **Inställningar → Automatiseringar → Scripts → Lägg till → YAML-läge** och klistra in:
+
+```yaml
+alias: "PostNord: Lägg till paket"
+sequence:
+  - service: postnord.add_package
+    data:
+      tracking_id: "{{ states('input_text.postnord_ny_forsandelse') }}"
+      owner: "{{ states('input_text.postnord_agare') }}"
+  - service: input_text.set_value
+    target:
+      entity_id: input_text.postnord_ny_forsandelse
+    data:
+      value: ""
+mode: single
+icon: mdi:package-variant-plus
+```
+
+### Steg 3: Installera auto-entities (rekommenderas)
+
+Installera [auto-entities](https://github.com/thomasloven/lovelace-auto-entities) via HACS. Det gör att paketlistan uppdateras automatiskt utan att du behöver redigera något i Lovelace när nya paket läggs till.
+
+### Steg 4: Lägg till Lovelace-vyn
+
+Se filen `lovelace-dashboard.yaml` i repot för komplett YAML. Kortversionen:
+
+```yaml
+# Inmatningsfält
+- type: entities
+  title: Lägg till paket
+  entities:
+    - entity: input_text.postnord_ny_forsandelse
+      name: Sändningsnummer eller URL
+    - entity: input_text.postnord_agare
+      name: Vems paket?
+
+# Knapp
+- type: button
+  name: Lägg till paket
+  icon: mdi:plus-circle-outline
+  tap_action:
+    action: call-service
+    service: script.postnord_lagg_till_paket
+
+# Alla aktiva paket (kräver auto-entities)
+- type: custom:auto-entities
+  filter:
+    include:
+      - integration: postnord
+        attributes:
+          archived: false
+  sort:
+    method: attribute
+    attribute: eta_timestamp
+    numeric: true
+  card:
+    type: entities
+    title: Pågående paket
+  show_empty: false
+```
 
 ### API-rate limits
 
@@ -332,9 +435,11 @@ postnord-playground/
 ├── track.py                              # CLI-testverktyg
 ├── api.key                               # Din API-nyckel (gitignorerad)
 ├── hacs.json                             # HACS-metadata
+├── lovelace-dashboard.yaml               # Komplett dashboard-YAML med instruktioner
 └── custom_components/
     └── postnord/
         ├── __init__.py                   # Integrationens setup/unload
+        │                                 # + tjänsterna add_package / remove_package
         ├── manifest.json                 # HA-metadata
         ├── const.py                      # Alla konstanter och nyckelnamn
         ├── api.py                        # Async HTTP-klient (aiohttp)
@@ -344,6 +449,7 @@ postnord-playground/
         │                                 # MailboxCoordinator – brevutdelning
         ├── sensor.py                     # PostNordSensor + PostNordMailboxSensor
         ├── config_flow.py                # ConfigFlow + OptionsFlow (meny-baserat)
+        ├── services.yaml                 # Tjänstedefinitioner (syns i Utvecklarverktyg)
         ├── strings.json                  # UI-strängar (kanonisk källa)
         └── translations/
             ├── sv.json                   # Svenska
@@ -377,6 +483,10 @@ postnord-playground/
 - `custom_components/postnord/coordinator.py` — `PackageData`-dataklassen definierar sensorns datamodell
 
 ### Vanliga uppgifter
+
+**Lägga till en ny HA-tjänst:**
+1. Definiera schema och handler i `__init__.py` (se `_register_services()`)
+2. Lägg till beskrivning i `services.yaml`
 
 **Lägga till ett nytt sensorattribut:**
 1. Lägg till konstant i `const.py`: `ATTR_NYTT = "nytt"`
