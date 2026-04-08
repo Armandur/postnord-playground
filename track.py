@@ -12,6 +12,7 @@ import urllib.error
 
 API_KEY_FILE = os.path.join(os.path.dirname(__file__), "api.key")
 BASE_URL = "https://api2.postnord.com/rest/shipment/v7/trackandtrace/id/{id}/public"
+TRACKING_URL_BASE = "https://api2.postnord.com/rest/shipment/v1/tracking/{country}/{id}"
 
 
 def load_api_key(provided: str | None) -> str:
@@ -41,6 +42,21 @@ def track(shipment_id: str, api_key: str, locale: str = "sv") -> dict:
             return {"error": e.code, "detail": json.loads(body)}
         except json.JSONDecodeError:
             return {"error": e.code, "detail": body}
+
+
+def get_tracking_url(shipment_id: str, api_key: str, country: str, language: str = "sv") -> str | None:
+    params = urllib.parse.urlencode({"apikey": api_key, "language": language})
+    url = TRACKING_URL_BASE.format(
+        country=urllib.parse.quote(country),
+        id=urllib.parse.quote(shipment_id),
+    ) + "?" + params
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode())
+            return data.get("url")
+    except urllib.error.HTTPError:
+        return None
 
 
 def fmt_address(addr: dict) -> str:
@@ -165,7 +181,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="PostNord Track & Trace terminal")
     parser.add_argument("--apikey", "-k", help="PostNord API-nyckel (32 tecken)")
     parser.add_argument("--locale", "-l", default="sv", choices=["sv", "en", "no", "da", "fi"])
+    parser.add_argument("--country", "-c", default="SE", choices=["SE", "NO", "FI", "DK"],
+                        help="Land för tracking-URL (standard: SE)")
     parser.add_argument("--raw", action="store_true", help="Skriv ut rå JSON")
+    parser.add_argument("--no-url", dest="no_url", action="store_true",
+                        help="Hämta inte tracking-URL")
     parser.add_argument("id", nargs="?", help="Sändnings- eller kolli-ID")
     args = parser.parse_args()
 
@@ -185,6 +205,10 @@ def main() -> None:
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
         print_result(data)
+        if not args.no_url:
+            tracking_url = get_tracking_url(shipment_id, api_key, args.country, args.locale)
+            if tracking_url:
+                print(f"\nTracking-URL: {tracking_url}")
 
 
 if __name__ == "__main__":
