@@ -183,17 +183,57 @@ def print_result(data: dict) -> None:
                     print(f"    {ev.get('eventTime', '')[:16]}  {ev.get('eventDescription', '')}  {place}")
 
 
+def cmd_delivery(args: argparse.Namespace) -> None:
+    url = f"https://portal.postnord.com/api/sendoutarrival/closest?postalCode={urllib.parse.quote(args.postalcode)}"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"Fel (HTTP {e.code}): {body}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.raw:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        return
+
+    print(f"Postnummer : {data.get('postalCode')} {data.get('city')}")
+    print(f"Senaste    : {data.get('delivery')}")
+    print(f"Nästa      : {data.get('upcoming')}")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="PostNord Track & Trace terminal")
-    parser.add_argument("--apikey", "-k", help="PostNord API-nyckel (32 tecken)")
-    parser.add_argument("--locale", "-l", default="sv", choices=["sv", "en", "no", "da", "fi"])
-    parser.add_argument("--country", "-c", default="SE", choices=["SE", "NO", "FI", "DK"],
-                        help="Land för tracking-URL (standard: SE)")
-    parser.add_argument("--raw", action="store_true", help="Skriv ut rå JSON")
-    parser.add_argument("--no-url", dest="no_url", action="store_true",
-                        help="Hämta inte tracking-URL")
-    parser.add_argument("id", nargs="?", help="Sändnings- eller kolli-ID")
+    parser = argparse.ArgumentParser(description="PostNord terminal")
+    subparsers = parser.add_subparsers(dest="command")
+
+    # track (default)
+    p_track = subparsers.add_parser("track", help="Spåra en försändelse")
+    p_track.add_argument("--apikey", "-k", help="PostNord API-nyckel (32 tecken)")
+    p_track.add_argument("--locale", "-l", default="sv", choices=["sv", "en", "no", "da", "fi"])
+    p_track.add_argument("--country", "-c", default="SE", choices=["SE", "NO", "FI", "DK"],
+                         help="Land för tracking-URL (standard: SE)")
+    p_track.add_argument("--raw", action="store_true", help="Skriv ut rå JSON")
+    p_track.add_argument("--no-url", dest="no_url", action="store_true",
+                         help="Hämta inte tracking-URL")
+    p_track.add_argument("id", nargs="?", help="Sändnings- eller kolli-ID")
+
+    # delivery
+    p_delivery = subparsers.add_parser("delivery", help="Visa utdelningsdagar för ett postnummer")
+    p_delivery.add_argument("postalcode", help="Postnummer (t.ex. 87140)")
+    p_delivery.add_argument("--raw", action="store_true", help="Skriv ut rå JSON")
+
     args = parser.parse_args()
+
+    if args.command == "delivery":
+        cmd_delivery(args)
+        return
+
+    # default: track (stöd för att köra utan subkommando)
+    if args.command is None:
+        # re-parse as track for backwards compatibility
+        p_track.set_defaults(no_url=False)
+        args = p_track.parse_args()
 
     api_key = load_api_key(args.apikey)
 
