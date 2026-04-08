@@ -110,6 +110,7 @@ class PostNordSensor(CoordinatorEntity[PostNordCoordinator], SensorEntity):
     """One sensor per tracked package."""
 
     _attr_has_entity_name = True
+    _attr_entity_registry_visible_default = False
 
     def __init__(
         self,
@@ -181,6 +182,7 @@ class PostNordMailboxSensor(CoordinatorEntity[MailboxCoordinator], SensorEntity)
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:mailbox"
+    _attr_entity_registry_visible_default = False
 
     def __init__(
         self,
