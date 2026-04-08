@@ -44,15 +44,19 @@ cards:
 
   # ─── AKTIVA PAKET (kräver auto-entities) ───────────────────────────────────
   # Visar automatiskt alla paket som inte är levererade, sorterade på närmast ETA.
+  # Försenade paket visas automatiskt med ⚠️-ikon (mdi:clock-alert-outline).
 
   - type: custom:auto-entities
     filter:
       include:
         - integration: postnord
-          attributes:
-            archived: false
       exclude:
         - entity_id: "sensor.postnord_mailbox_*"
+        - state: DELIVERED
+        - state: RETURNED
+        - state: EXPIRED
+        - state: unavailable
+        - state: unknown
     sort:
       method: attribute
       attribute: eta_timestamp
@@ -63,31 +67,13 @@ cards:
       icon: mdi:truck-delivery
     show_empty: false
 
-  # ─── FÖRSENADE PAKET ───────────────────────────────────────────────────────
-
-  - type: custom:auto-entities
-    filter:
-      include:
-        - integration: postnord
-          attributes:
-            is_delayed: true
-            archived: false
-      exclude:
-        - entity_id: "sensor.postnord_mailbox_*"
-    card:
-      type: entities
-      title: ⚠️ Försenade paket
-      icon: mdi:clock-alert-outline
-    show_empty: false
-
   # ─── LEVERERADE PAKET ──────────────────────────────────────────────────────
 
   - type: custom:auto-entities
     filter:
       include:
         - integration: postnord
-          attributes:
-            archived: true
+          state: DELIVERED
       exclude:
         - entity_id: "sensor.postnord_mailbox_*"
     card:
