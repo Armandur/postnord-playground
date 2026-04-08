@@ -100,9 +100,11 @@ cards:
 
   - type: conditional
     conditions:
-      - entity: sensor.postnord_mailbox_87140   # Byt mot ditt postnummer
-        state_not: "unavailable"
-        state_not: "unknown"
+      - condition: state
+        entity: sensor.postnord_mailbox_87140   # Byt mot ditt postnummer
+        state_not:
+          - "unavailable"
+          - "unknown"
     card:
       type: glance
       title: Brevlåda
