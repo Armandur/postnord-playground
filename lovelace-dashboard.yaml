@@ -42,9 +42,10 @@ cards:
     hold_action:
       action: none
 
-  # ─── AKTIVA PAKET (kräver auto-entities) ───────────────────────────────────
-  # Visar automatiskt alla paket som inte är levererade, sorterade på närmast ETA.
-  # Försenade paket visas automatiskt med ⚠️-ikon (mdi:clock-alert-outline).
+  # ─── AKTIVA PAKET med Mushroom (kräver auto-entities + Mushroom Cards) ─────
+  # Visar avsändare + beräknat leveransdatum, dynamisk ikon och färg per status.
+  # Försenade paket markeras automatiskt i rött med ⚠️-ikon.
+  # Klick öppnar detaljpanelen med spårningslänk.
 
   - type: custom:auto-entities
     filter:
@@ -52,6 +53,32 @@ cards:
         - integration: postnord
           attributes:
             postnord_sensor_type: package
+          options:
+            type: custom:mushroom-template-card
+            primary: >
+              {{ state_attr(entity, 'status_header') or state_attr(entity, 'tracking_id') }}
+            secondary: >
+              {% set sender = state_attr(entity, 'sender') %}
+              {% set eta = state_attr(entity, 'eta') %}
+              {% if sender %}{{ sender }}{% endif %}
+              {%- if sender and eta %} · {% endif %}
+              {%- if eta %}{{ eta[:10] }}{% endif %}
+            icon: >
+              {% set s = states(entity) %}
+              {% set d = state_attr(entity, 'delivery_type') %}
+              {% if s == 'DELIVERED' %}mdi:package-variant-closed-check
+              {% elif state_attr(entity, 'is_delayed') %}mdi:clock-alert-outline
+              {% elif d == 'SERVICE_POINT' and s == 'AVAILABLE_FOR_PICKUP' %}mdi:store-marker
+              {% elif d == 'PARCEL_BOX' and s == 'AVAILABLE_FOR_PICKUP' %}mdi:mailbox-open-up
+              {% elif d == 'MAILBOX' %}mdi:email-fast-outline
+              {% elif d == 'HOME' %}mdi:truck-delivery-outline
+              {% else %}mdi:truck-delivery{% endif %}
+            icon_color: >
+              {% if state_attr(entity, 'is_delayed') %}red
+              {% elif states(entity) == 'AVAILABLE_FOR_PICKUP' %}green
+              {% else %}blue{% endif %}
+            tap_action:
+              action: more-info
       exclude:
         - state: DELIVERED
         - state: RETURNED
@@ -63,10 +90,35 @@ cards:
       attribute: eta_timestamp
       numeric: true
     card:
-      type: entities
-      title: Pågående paket
-      icon: mdi:truck-delivery
+      type: vertical-stack
+    card_param: cards
     show_empty: false
+
+  # ─── AKTIVA PAKET utan Mushroom (inbyggt, kräver bara auto-entities) ────────
+  # Alternativ om du inte har Mushroom installerat.
+  # Ta bort avsnittet ovan och avkommentera detta om du föredrar enklare kort.
+
+  # - type: custom:auto-entities
+  #   filter:
+  #     include:
+  #       - integration: postnord
+  #         attributes:
+  #           postnord_sensor_type: package
+  #     exclude:
+  #       - state: DELIVERED
+  #       - state: RETURNED
+  #       - state: EXPIRED
+  #       - state: unavailable
+  #       - state: unknown
+  #   sort:
+  #     method: attribute
+  #     attribute: eta_timestamp
+  #     numeric: true
+  #   card:
+  #     type: entities
+  #     title: Pågående paket
+  #     icon: mdi:truck-delivery
+  #   show_empty: false
 
   # ─── LEVERERADE PAKET ──────────────────────────────────────────────────────
 

@@ -257,11 +257,10 @@ type: entity
 entity: sensor.uo553662591se
 name: Jula-paket
 tap_action:
-  action: url
-  url_path: "{{ state_attr('sensor.uo553662591se', 'tracking_url') }}"
+  action: more-info
 ```
 
-> **Obs:** `tap_action: url` med template fungerar inte i alla inbyggda kort. Använd `markdown`-kortet om länken inte fungerar.
+> **Obs:** `tap_action: url` med Jinja2-template fungerar inte i HA:s inbyggda kort — URL:en URL-kodas istället för att renderas. Använd `more-info` (detaljpanelen visar spårningslänken) eller `markdown`-kortet (Kort 1) för en klickbar länk.
 
 ---
 
@@ -271,22 +270,80 @@ tap_action:
 type: custom:mushroom-template-card
 primary: "{{ state_attr('sensor.uo553662591se', 'status_header') }}"
 secondary: >
-  {{ state_attr('sensor.uo553662591se', 'last_event') }}
-icon: mdi:email-fast-outline
+  {% set sender = state_attr('sensor.uo553662591se', 'sender') %}
+  {% set eta = state_attr('sensor.uo553662591se', 'eta') %}
+  {% if sender %}{{ sender }}{% endif %}
+  {%- if sender and eta %} · {% endif %}
+  {%- if eta %}{{ eta[:10] }}{% endif %}
+icon: mdi:package-variant
 icon_color: >
-  {% if states('sensor.uo553662591se') == 'DELIVERED' %}green
-  {% elif state_attr('sensor.uo553662591se', 'is_delayed') %}red
+  {% if state_attr('sensor.uo553662591se', 'is_delayed') %}red
+  {% elif states('sensor.uo553662591se') == 'AVAILABLE_FOR_PICKUP' %}green
   {% else %}blue{% endif %}
 tap_action:
-  action: url
-  url_path: "{{ state_attr('sensor.uo553662591se', 'tracking_url') }}"
+  action: more-info
 ```
+
+> **Obs:** `tap_action: url` med Jinja2-template fungerar inte i mushroom-template-card — mallen URL-kodas istället för att renderas. Använd `more-info` (detaljpanelen innehåller spårningslänken) eller Kort 1 (`markdown`) för en direkt länk.
 
 ---
 
-### Kort 4: Alla aktiva paket sorterade på närmast leverans (kräver auto-entities)
+### Kort 4: Alla aktiva paket — rik vy med Mushroom (kräver auto-entities + Mushroom)
 
-Filtrerar på `postnord_sensor_type: package` (sträng) för att utesluta brevutdelningssensorn, och exkluderar sedan levererade/returnerade states.
+Visar alla aktiva paket som mushroom-template-cards med dynamisk ikon, färg, avsändare och beräknat leveransdatum. Sorteras automatiskt på närmast ETA. Försenade paket markeras i rött.
+
+```yaml
+type: custom:auto-entities
+filter:
+  include:
+    - integration: postnord
+      attributes:
+        postnord_sensor_type: package
+      options:
+        type: custom:mushroom-template-card
+        primary: >
+          {{ state_attr(entity, 'status_header') or state_attr(entity, 'tracking_id') }}
+        secondary: >
+          {% set sender = state_attr(entity, 'sender') %}
+          {% set eta = state_attr(entity, 'eta') %}
+          {% if sender %}{{ sender }}{% endif %}
+          {%- if sender and eta %} · {% endif %}
+          {%- if eta %}{{ eta[:10] }}{% endif %}
+        icon: >
+          {% set s = states(entity) %}
+          {% set d = state_attr(entity, 'delivery_type') %}
+          {% if s == 'DELIVERED' %}mdi:package-variant-closed-check
+          {% elif state_attr(entity, 'is_delayed') %}mdi:clock-alert-outline
+          {% elif d == 'SERVICE_POINT' and s == 'AVAILABLE_FOR_PICKUP' %}mdi:store-marker
+          {% elif d == 'PARCEL_BOX' and s == 'AVAILABLE_FOR_PICKUP' %}mdi:mailbox-open-up
+          {% elif d == 'MAILBOX' %}mdi:email-fast-outline
+          {% elif d == 'HOME' %}mdi:truck-delivery-outline
+          {% else %}mdi:truck-delivery{% endif %}
+        icon_color: >
+          {% if state_attr(entity, 'is_delayed') %}red
+          {% elif states(entity) == 'AVAILABLE_FOR_PICKUP' %}green
+          {% else %}blue{% endif %}
+        tap_action:
+          action: more-info
+  exclude:
+    - state: DELIVERED
+    - state: RETURNED
+    - state: EXPIRED
+    - state: unavailable
+    - state: unknown
+sort:
+  method: attribute
+  attribute: eta_timestamp
+  numeric: true
+card:
+  type: vertical-stack
+card_param: cards
+show_empty: false
+```
+
+#### Enklare alternativ utan Mushroom (inbyggt)
+
+Om du inte har Mushroom installerat fungerar detta enkla alternativ:
 
 ```yaml
 type: custom:auto-entities
