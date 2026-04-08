@@ -133,7 +133,13 @@ Se filen `lovelace-dashboard.yaml` i repot för komplett YAML. Kortversionen:
     include:
       - integration: postnord
         attributes:
-          archived: false
+          postnord_sensor_type: package
+    exclude:
+      - state: DELIVERED
+      - state: RETURNED
+      - state: EXPIRED
+      - state: unavailable
+      - state: unknown
   sort:
     method: attribute
     attribute: eta_timestamp
@@ -158,10 +164,11 @@ Med standardinställningen (30 min) och 100 aktiva paket: ~4 800 anrop/dag — l
 
 ## Sensorernas attribut
 
-Varje pакetsensor (`sensor.postnord_<ID>`) exponerar följande attribut:
+Varje paketsensor (`sensor.postnord_<ID>`) exponerar följande attribut:
 
 | Attribut | Typ | Beskrivning |
 |---|---|---|
+| `postnord_sensor_type` | str | Alltid `"package"` — används för att filtrera i auto-entities |
 | `tracking_id` | str | Sändningsnumret |
 | `owner` | str | Fritext, t.ex. "Rasmus" |
 | `tracking_url` | str \| None | Klickbar spårnings-URL |
@@ -181,6 +188,8 @@ Varje pакetsensor (`sensor.postnord_<ID>`) exponerar följande attribut:
 | `country` | str | Landkod: `SE`, `NO`, `FI`, `DK` |
 | `archived` | bool | `True` = paketet är levererat, pollas inte längre |
 
+> **OBS om booleaner i auto-entities:** auto-entities anropar `.startsWith()` på alla filtervärden och kraschar om värdet är ett booleskt `true`/`false`. Filtrera därför **aldrig** på `archived`, `is_delayed` eller `risk_for_delay` i auto-entities. Använd istället state-baserade filter (se kortexemplen nedan).
+
 ### Möjliga statusvärden (state)
 
 Dessa kommer direkt från PostNords API:
@@ -197,10 +206,11 @@ Dessa kommer direkt från PostNords API:
 
 ### Brevutdelningssensor
 
-`sensor.postnord_mailbox_<postnummer>` — skapad om postnummer angavs vid konfiguration.
+Skapad om postnummer angavs vid konfiguration. Entitets-ID genereras av HA från namnet "Postlåda {postnummer}" — svenska tecken konverteras, så det faktiska ID:t kan bli t.ex. `sensor.postlada_87140`. Kontrollera det faktiska ID:t under **Inställningar → Enheter & tjänster → Entiteter**.
 
 | Attribut | Beskrivning |
 |---|---|
+| `postnord_sensor_type` | Alltid `"mailbox"` — används för att exkludera i auto-entities-filter |
 | `postal_code` | Postnummer |
 | `city` | Ort |
 | `last_delivery` | Senaste utdelningsdatum |
@@ -276,13 +286,21 @@ tap_action:
 
 ### Kort 4: Alla aktiva paket sorterade på närmast leverans (kräver auto-entities)
 
+Filtrerar på `postnord_sensor_type: package` (sträng) för att utesluta brevutdelningssensorn, och exkluderar sedan levererade/returnerade states.
+
 ```yaml
 type: custom:auto-entities
 filter:
   include:
     - integration: postnord
       attributes:
-        archived: false
+        postnord_sensor_type: package
+  exclude:
+    - state: DELIVERED
+    - state: RETURNED
+    - state: EXPIRED
+    - state: unavailable
+    - state: unknown
 sort:
   method: attribute
   attribute: eta_timestamp
@@ -290,11 +308,14 @@ sort:
 card:
   type: entities
   title: Aktiva paket
+show_empty: false
 ```
 
 ---
 
 ### Kort 5: Grupperat per leveranstyp (kräver auto-entities)
+
+`delivery_type` är en sträng och fungerar i auto-entities. Brevutdelningssensorn filtreras automatiskt bort eftersom den inte har dessa delivery_type-värden.
 
 ```yaml
 type: vertical-stack
@@ -305,11 +326,13 @@ cards:
         - integration: postnord
           attributes:
             delivery_type: SERVICE_POINT
-            archived: false
+      exclude:
+        - state: DELIVERED
     card:
       type: entities
       title: Uthämtning på ombud
       icon: mdi:store-marker
+    show_empty: false
 
   - type: custom:auto-entities
     filter:
@@ -317,11 +340,13 @@ cards:
         - integration: postnord
           attributes:
             delivery_type: MAILBOX
-            archived: false
+      exclude:
+        - state: DELIVERED
     card:
       type: entities
       title: Brevlådepost
       icon: mdi:mailbox
+    show_empty: false
 
   - type: custom:auto-entities
     filter:
@@ -329,16 +354,18 @@ cards:
         - integration: postnord
           attributes:
             delivery_type: HOME
-            archived: false
+      exclude:
+        - state: DELIVERED
     card:
       type: entities
       title: Hemleverans
       icon: mdi:truck-delivery-outline
+    show_empty: false
 ```
 
 ---
 
-### Kort 6: Försenade paket (kräver auto-entities)
+### Kort 6: Levererade paket (kräver auto-entities)
 
 ```yaml
 type: custom:auto-entities
@@ -346,29 +373,37 @@ filter:
   include:
     - integration: postnord
       attributes:
-        is_delayed: true
+        postnord_sensor_type: package
+      state: DELIVERED
 card:
   type: entities
-  title: ⚠️ Försenade paket
+  title: Levererade paket
+  icon: mdi:package-variant-closed-check
 show_empty: false
 ```
+
+> **OBS:** Det går inte att filtrera på `is_delayed: true` i auto-entities (boolean-krasch). Försenade paket visas automatiskt med ⚠️-ikonen i den aktiva listan.
 
 ---
 
 ### Kort 7: Brevutdelning (inbyggt)
 
+Kontrollera det faktiska entitets-ID:t under **Inställningar → Enheter & tjänster → Entiteter** — HA konverterar svenska tecken (t.ex. `sensor.postlada_87140`).
+
 ```yaml
 type: glance
 title: Brevlåda
 entities:
-  - entity: sensor.postnord_mailbox_87140
+  - entity: sensor.postlada_87140   # Byt mot ditt faktiska entitets-ID
     name: Nästa utdelning
     icon: mdi:mailbox
 ```
 
 ---
 
-### Kort 8: Paket per person med Mushroom (kräver Mushroom + auto-entities)
+### Kort 8: Paket per person (kräver auto-entities)
+
+`owner` är en sträng och fungerar som filter.
 
 ```yaml
 type: custom:auto-entities
@@ -376,11 +411,16 @@ filter:
   include:
     - integration: postnord
       attributes:
+        postnord_sensor_type: package
         owner: Rasmus
-        archived: false
+  exclude:
+    - state: DELIVERED
+    - state: RETURNED
+    - state: EXPIRED
 card:
   type: entities
   title: Rasmus paket
+show_empty: false
 ```
 
 ---
@@ -469,6 +509,8 @@ postnord-playground/
 4. Fallback → `UNKNOWN` (hanteras alltid, påverkar bara ikon)
 
 **Ikonmatris:** Ikonen beräknas från `delivery_type × status` (se `sensor.py:_ICON_RULES`). Fördröjda paket (`is_delayed=True`) åsidosätter övriga regler.
+
+**`postnord_sensor_type`-attributet:** Båda sensortyperna exponerar ett strängattribut `postnord_sensor_type` (`"package"` eller `"mailbox"`). Det används uteslutande för att filtrera i auto-entities-kort. Bakgrunden: auto-entities anropar `.startsWith()` på alla filtervärden och kraschar på booleaner (`true`/`false`), och entity_id-baserad glob-filtrering är opålitlig eftersom HA konverterar svenska tecken i namn (t.ex. `Postlåda` → `postlada`). Strängattribut är den enda robusta lösningen.
 
 **Alternativflöde:** Menybaserat med fyra val: Lägg till paket / Ta bort paket / Ändra intervall / Ändra postnummer. Ändringar triggar automatisk reload av integrationen via `update_listener`.
 
