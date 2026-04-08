@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "PostNord",
+        "description": "Ange din PostNord API-nyckel. Postnummer är valfritt och används för att visa nästa brevutdelning.",
+        "data": {
+          "api_key": "API-nyckel",
+          "postal_code": "Postnummer (valfritt)"
+        }
+      }
+    },
+    "error": {
+      "api_key_required": "API-nyckel krävs."
+    },
+    "abort": {
+      "already_configured": "PostNord är redan konfigurerat."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PostNord-inställningar",
+        "menu_options": {
+          "add_package": "Lägg till paket",
+          "remove_package": "Ta bort paket",
+          "change_interval": "Ändra uppdateringsintervall",
+          "change_postal_code": "Ändra postnummer"
+        }
+      },
+      "add_package": {
+        "title": "Lägg till paket",
+        "description": "Ange ett eller flera sändningsnummer eller spårnings-URL:er, ett per rad.",
+        "data": {
+          "tracking_inputs": "Sändningsnummer / spårnings-URL:er",
+          "owner": "Ägare (valfritt)",
+          "country": "Land"
+        }
+      },
+      "remove_package": {
+        "title": "Ta bort paket",
+        "data": {
+          "packages_to_remove": "Välj paket att ta bort"
+        }
+      },
+      "change_interval": {
+        "title": "Uppdateringsintervall",
+        "description": "Hur ofta aktiva paket ska uppdateras (minuter).",
+        "data": {
+          "update_interval_minutes": "Intervall"
+        }
+      },
+      "change_postal_code": {
+        "title": "Postnummer för brevutdelning",
+        "description": "Lämna tomt för att inaktivera utdelningssensorn.",
+        "data": {
+          "postal_code": "Postnummer"
+        }
+      }
+    },
+    "error": {
+      "no_tracking_ids": "Inga giltiga sändningsnummer hittades.",
+      "already_configured": "Alla angivna paket är redan tillagda."
+    },
+    "abort": {
+      "no_packages": "Inga paket är konfigurerade."
+    }
+  }
+}

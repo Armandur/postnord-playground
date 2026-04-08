@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "PostNord",
+        "description": "Enter your PostNord API key. Postal code is optional and enables a mailbox delivery schedule sensor.",
+        "data": {
+          "api_key": "API key",
+          "postal_code": "Postal code (optional)"
+        }
+      }
+    },
+    "error": {
+      "api_key_required": "API key is required."
+    },
+    "abort": {
+      "already_configured": "PostNord is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PostNord settings",
+        "menu_options": {
+          "add_package": "Add package",
+          "remove_package": "Remove package",
+          "change_interval": "Change update interval",
+          "change_postal_code": "Change postal code"
+        }
+      },
+      "add_package": {
+        "title": "Add package",
+        "description": "Enter one or more tracking numbers or PostNord tracking URLs, one per line.",
+        "data": {
+          "tracking_inputs": "Tracking numbers / URLs",
+          "owner": "Owner (optional)",
+          "country": "Country"
+        }
+      },
+      "remove_package": {
+        "title": "Remove package",
+        "data": {
+          "packages_to_remove": "Select packages to remove"
+        }
+      },
+      "change_interval": {
+        "title": "Update interval",
+        "description": "How often active packages should be refreshed (minutes).",
+        "data": {
+          "update_interval_minutes": "Interval"
+        }
+      },
+      "change_postal_code": {
+        "title": "Postal code for mailbox delivery",
+        "description": "Leave empty to disable the mailbox delivery sensor.",
+        "data": {
+          "postal_code": "Postal code"
+        }
+      }
+    },
+    "error": {
+      "no_tracking_ids": "No valid tracking numbers found.",
+      "already_configured": "All specified packages are already configured."
+    },
+    "abort": {
+      "no_packages": "No packages are configured."
+    }
+  }
+}
