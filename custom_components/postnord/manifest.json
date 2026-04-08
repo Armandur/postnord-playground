@@ -1,0 +1,11 @@
+{
+  "domain": "postnord",
+  "name": "PostNord",
+  "version": "1.0.0",
+  "config_flow": true,
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [],
+  "iot_class": "cloud_polling",
+  "documentation": "https://github.com/armandur/postnord-playground"
+}

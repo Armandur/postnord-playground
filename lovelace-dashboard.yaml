@@ -1,0 +1,223 @@
+# PostNord Dashboard för Home Assistant
+#
+# KRAV:
+#   1. Skapa två input_text-hjälpare (Inställningar → Enheter & tjänster → Hjälpare → Lägg till → Text):
+#        - Entitets-ID: input_text.postnord_ny_forsandelse   Namn: "Nytt sändningsnummer"
+#        - Entitets-ID: input_text.postnord_agare            Namn: "Ägare"
+#
+#   2. Skapa ett script (Inställningar → Automatiseringar → Scripts → Lägg till):
+#        Se "Script: Lägg till paket" nedan.
+#
+#   3. Installera auto-entities via HACS för automatisk paketlista (rekommenderas starkt).
+#        https://github.com/thomasloven/lovelace-auto-entities
+#
+# Lägg till som ny vy i din dashboard via Redigera dashboard → Lägg till vy → YAML-läge
+# och klistra in innehållet under "cards:".
+
+title: PostNord
+path: postnord
+icon: mdi:package-variant
+
+cards:
+
+  # ─── LÄGG TILL PAKET ───────────────────────────────────────────────────────
+
+  - type: entities
+    title: Lägg till paket
+    icon: mdi:package-variant-plus
+    entities:
+      - entity: input_text.postnord_ny_forsandelse
+        name: Sändningsnummer eller spårnings-URL
+        icon: mdi:barcode-scan
+      - entity: input_text.postnord_agare
+        name: Vems paket?
+        icon: mdi:account
+
+  - type: button
+    name: Lägg till paket
+    icon: mdi:plus-circle-outline
+    tap_action:
+      action: call-service
+      service: script.postnord_lagg_till_paket
+    hold_action:
+      action: none
+
+  # ─── AKTIVA PAKET med Mushroom (kräver auto-entities + Mushroom Cards) ─────
+  # Visar avsändare + beräknat leveransdatum, dynamisk ikon och färg per status.
+  # Försenade paket markeras automatiskt i rött med ⚠️-ikon.
+  # Klick öppnar detaljpanelen med spårningslänk.
+
+  - type: custom:auto-entities
+    filter:
+      include:
+        - integration: postnord
+          attributes:
+            postnord_sensor_type: package
+          options:
+            type: custom:mushroom-template-card
+            primary: >
+              {{ state_attr(entity, 'status_header') or state_attr(entity, 'tracking_id') }}
+            secondary: >
+              {% set sender = state_attr(entity, 'sender') %}
+              {% set eta = state_attr(entity, 'eta') %}
+              {% if sender %}{{ sender }}{% endif %}
+              {%- if sender and eta %} · {% endif %}
+              {%- if eta %}{{ eta[:10] }}{% endif %}
+            icon: >
+              {% set s = states(entity) %}
+              {% set d = state_attr(entity, 'delivery_type') %}
+              {% if s == 'DELIVERED' %}mdi:package-variant-closed-check
+              {% elif state_attr(entity, 'is_delayed') %}mdi:clock-alert-outline
+              {% elif d == 'SERVICE_POINT' and s == 'AVAILABLE_FOR_PICKUP' %}mdi:store-marker
+              {% elif d == 'PARCEL_BOX' and s == 'AVAILABLE_FOR_PICKUP' %}mdi:mailbox-open-up
+              {% elif d == 'MAILBOX' %}mdi:email-fast-outline
+              {% elif d == 'HOME' %}mdi:truck-delivery-outline
+              {% else %}mdi:truck-delivery{% endif %}
+            icon_color: >
+              {% if state_attr(entity, 'is_delayed') %}red
+              {% elif states(entity) == 'AVAILABLE_FOR_PICKUP' %}green
+              {% else %}blue{% endif %}
+            tap_action:
+              action: more-info
+      exclude:
+        - state: DELIVERED
+        - state: RETURNED
+        - state: EXPIRED
+        - state: unavailable
+        - state: unknown
+    sort:
+      method: attribute
+      attribute: eta_timestamp
+      numeric: true
+    card:
+      type: vertical-stack
+    card_param: cards
+    show_empty: false
+
+  # ─── AKTIVA PAKET utan Mushroom (inbyggt, kräver bara auto-entities) ────────
+  # Alternativ om du inte har Mushroom installerat.
+  # Ta bort avsnittet ovan och avkommentera detta om du föredrar enklare kort.
+
+  # - type: custom:auto-entities
+  #   filter:
+  #     include:
+  #       - integration: postnord
+  #         attributes:
+  #           postnord_sensor_type: package
+  #     exclude:
+  #       - state: DELIVERED
+  #       - state: RETURNED
+  #       - state: EXPIRED
+  #       - state: unavailable
+  #       - state: unknown
+  #   sort:
+  #     method: attribute
+  #     attribute: eta_timestamp
+  #     numeric: true
+  #   card:
+  #     type: entities
+  #     title: Pågående paket
+  #     icon: mdi:truck-delivery
+  #   show_empty: false
+
+  # ─── LEVERERADE PAKET ──────────────────────────────────────────────────────
+
+  - type: custom:auto-entities
+    filter:
+      include:
+        - integration: postnord
+          attributes:
+            postnord_sensor_type: package
+          state: DELIVERED
+    card:
+      type: entities
+      title: Levererade paket
+      icon: mdi:package-variant-closed-check
+    show_empty: false
+
+  # ─── BREVUTDELNING ─────────────────────────────────────────────────────────
+  # Visas bara om du konfigurerat postnummer i integrationen.
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: sensor.postnord_mailbox_87140   # Byt mot ditt postnummer
+        state_not:
+          - "unavailable"
+          - "unknown"
+    card:
+      type: glance
+      title: Brevlåda
+      entities:
+        - entity: sensor.postnord_mailbox_87140  # Byt mot ditt postnummer
+          name: Nästa utdelning
+          icon: mdi:mailbox
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# ALTERNATIV: Utan auto-entities (inbyggda kort)
+#
+# Om du inte har auto-entities installerat, använd markdown-kort för varje paket.
+# Ersätt "sensor.uo553662591se" med ditt faktiska sensor-ID.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# - type: markdown
+#   content: >
+#     ## {{ state_attr('sensor.uo553662591se', 'status_header') or states('sensor.uo553662591se') }}
+#
+#     {{ state_attr('sensor.uo553662591se', 'status_body') }}
+#
+#     | | |
+#     |---|---|
+#     | **Avsändare** | {{ state_attr('sensor.uo553662591se', 'sender') }} |
+#     | **Tjänst** | {{ state_attr('sensor.uo553662591se', 'service') }} |
+#     | **Senaste händelse** | {{ state_attr('sensor.uo553662591se', 'last_event') }} |
+#
+#     [🔗 Spåra paketet →]({{ state_attr('sensor.uo553662591se', 'tracking_url') }})
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCRIPT: Lägg till paket
+#
+# Skapa detta under Inställningar → Automatiseringar → Scripts → Lägg till → YAML-läge
+# Entitets-ID blir: script.postnord_lagg_till_paket
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# alias: "PostNord: Lägg till paket"
+# description: "Läser input_text-hjälparna och anropar postnord.add_package"
+# sequence:
+#   - service: postnord.add_package
+#     data:
+#       tracking_id: "{{ states('input_text.postnord_ny_forsandelse') }}"
+#       owner: "{{ states('input_text.postnord_agare') }}"
+#   - service: input_text.set_value
+#     target:
+#       entity_id: input_text.postnord_ny_forsandelse
+#     data:
+#       value: ""
+# mode: single
+# icon: mdi:package-variant-plus
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTOMATION: Avisering vid leverans
+#
+# Triggas automatiskt när ett paket ändrar status till DELIVERED.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# alias: "PostNord: Paket levererat"
+# trigger:
+#   - platform: state
+#     entity_id: sensor.postnord_        # wildcard fungerar inte, lista specifika eller använd
+#     to: DELIVERED                       # device trigger istället
+# condition: []
+# action:
+#   - service: notify.mobile_app_din_telefon
+#     data:
+#       title: "📦 Paket levererat!"
+#       message: >
+#         {{ state_attr(trigger.entity_id, 'status_header') }}
+#         Avsändare: {{ state_attr(trigger.entity_id, 'sender') }}
+#         {% if state_attr(trigger.entity_id, 'pickup_location') %}
+#         Hämtas på: {{ state_attr(trigger.entity_id, 'pickup_location') }}
+#         {% endif %}
